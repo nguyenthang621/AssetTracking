@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      .custom-marker {
+        width: 20px;
+        height: 20px;
+        background-color: transparent;
+        border: 2px dashed #ff0000; /* Đường nét đứt */
+        border-radius: 50%; /* Hình tròn */
+        position: relative;
+      }
+      .custom-marker-inner {
+        width: 10px;
+        height: 10px;
+        background-color: #ff0000;
+        border-radius: 50%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="custom-marker">
+      <div class="custom-marker-inner"></div>
+    </div>
+  </body>
+</html>

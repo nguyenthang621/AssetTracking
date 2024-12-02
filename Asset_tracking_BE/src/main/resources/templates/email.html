@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+</head>
+<body>
+    <h2>Motion Detected After Hours</h2>
+
+    <p><span th:text="${trackerName}"></span> has move inside zone <span th:text="${zoneName}"></span></p>
+	<hr>
+	<p>Time: <span th:text="${time}"></span></p>
+	<p>Make: <span th:text="${person}"></span></p>
+	<p>Model: <span th:text="${model}"></span></p>
+	<p>Year: <span th:text="${year}"></span></p>
+	<p>Location: <span th:text="${location}"></span></p>
+	<p>Position: <span th:text="${x}"></span> , <span th:text="${y}"></span></p>
+	<p>Posotion reported at: <span th:text="${timereport}"></span></p>
+	<p style = "color:blue">View Alert Position in Googles Map</p>
+	<button type="button" style = "background-color:blue; color: white" >View Detail!</button>
+</body>
+</html>
