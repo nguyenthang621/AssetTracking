@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Asset Tracking</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC2yS6nDoUJ1kM2bsx-1sfC8lt8jFfEGz8&libraries=drawing"></script>
+    <script src="https://cdn.socket.io/4.1.3/socket.io.min.js"></script>
+    <!-- toast -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/toastify-js"
+    ></script>
+    <style>
+      #map {
+        height: 500px;
+        width: 100%;
+      }
+      .delete-option {
+        background-color: white;
+        border: 1px solid black;
+        padding: 5px;
+        cursor: pointer;
+        position: absolute;
+        display: none;
+        z-index: 100;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="deleteOption" class="delete-option">Delete Shape</div>
+    <script>
+      var map, drawingManager;
+      var shapes = [];
+      var selectedShape = null;
+      const urlApi = "http://10.0.40.222:5000";
+
+      // Init Google Maps
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 0, lng: 0 },
+        zoom: 2,
+      });
+
+      var marker = new google.maps.Marker({
+        position: { lat: 0, lng: 0 },
+        map: map,
+      });
+
+      // Init tools Google Maps
+      drawingManager = new google.maps.drawing.DrawingManager({
+        drawingMode: google.maps.drawing.OverlayType.POLYGON,
+        drawingControl: true,
+        drawingControlOptions: {
+          position: google.maps.ControlPosition.TOP_CENTER,
+          drawingModes: ["polygon", "rectangle", "circle"],
+        },
+        polygonOptions: {
+          editable: true,
+          draggable: true,
+        },
+        rectangleOptions: {
+          editable: true,
+          draggable: true,
+        },
+        circleOptions: {
+          editable: true,
+          draggable: true,
+        },
+      });
+      drawingManager.setMap(map);
+
+      // Hàm tạo màu ngẫu nhiên
+      function getRandomColor() {
+        var letters = "0123456789ABCDEF";
+        var color = "#";
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      }
+
+      // Event listening
+      google.maps.event.addListener(
+        drawingManager,
+        "overlaycomplete",
+        function (event) {
+          var newShape = event.overlay;
+          newShape.type = event.type;
+          shapes.push(newShape);
+
+          // Áp dụng màu ngẫu nhiên cho hình vẽ
+          var randomColor = getRandomColor();
+          if (
+            event.type === google.maps.drawing.OverlayType.POLYGON ||
+            event.type === google.maps.drawing.OverlayType.RECTANGLE
+          ) {
+            newShape.setOptions({
+              fillColor: randomColor,
+              strokeColor: randomColor,
+            });
+          } else if (event.type === google.maps.drawing.OverlayType.CIRCLE) {
+            newShape.setOptions({
+              fillColor: randomColor,
+              strokeColor: randomColor,
+            });
+          }
+
+          // Lưu lại tọa độ
+          var path = newShape.getPath();
+          var coordinates = [];
+          path.forEach(function (latLng) {
+            coordinates.push({ lat: latLng.lat(), lng: latLng.lng() });
+          });
+
+          // Listening click mourse right
+          google.maps.event.addListener(
+            newShape,
+            "rightclick",
+            function (event) {
+              selectShape(newShape, event);
+            }
+          );
+
+          // Update zone
+          sendShapeData(newShape);
+          console.log("Polygon coordinates:", coordinates, event.type);
+        }
+      );
+
+      // Function select and delete
+      function selectShape(shape, event) {
+        if (selectedShape) {
+          selectedShape.setEditable(false);
+        }
+        selectedShape = shape;
+        selectedShape.setEditable(true);
+
+        var deleteOption = document.getElementById("deleteOption");
+        deleteOption.style.display = "block";
+        deleteOption.style.left = event.pixel.x + "px";
+        deleteOption.style.top = event.pixel.y + "px";
+      }
+
+      // Function excute delete
+      document.getElementById("deleteOption").onclick = function () {
+        if (selectedShape) {
+          selectedShape.setMap(null);
+          shapes = shapes.filter(function (shape) {
+            return shape !== selectedShape;
+          });
+          selectedShape = null;
+          this.style.display = "none";
+
+          var shapeData = {
+            type: "DELETE",
+            coordinates: [],
+          };
+          fetch(urlApi + "/set_zone", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(shapeData),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              console.log("Success:", data);
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+            });
+        }
+      };
+
+      // Ẩn popup khi nhấp vào bản đồ
+      map.addListener("click", function () {
+        document.getElementById("deleteOption").style.display = "none";
+      });
+
+      function getRandomOffset(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      // Kết nối với server WebSocket
+      localStorage.debug = "*";
+      var socket = io(urlApi, {
+        // reconnection: false,
+        query: `username=defaultUser&room=defaultRoom`,
+      });
+
+      // Lắng nghe sự kiện 'update_location' từ server
+      socket.on("update_location", function (data) {
+        console.log("data: " + data);
+        var lat = data.latitude;
+        var lng = data.longitude;
+
+        console.log(lat, lng);
+
+        // Cập nhật vị trí của marker và bản đồ
+        var newPosition = new google.maps.LatLng(lat, lng);
+        marker.setPosition(newPosition);
+
+        if (data.inside && data.inside == "OUTSIDE") {
+          Toastify({
+            text: "Vật thể ra ngoài vùng an toàn",
+            duration: 1000,
+            close: true,
+            gravity: "top",
+            position: "left",
+            stopOnFocus: true,
+            style: {
+              background: "linear-gradient(to left, #fa2a2a, #f70505)",
+            },
+          }).showToast();
+        }
+      });
+
+      // Update zone
+      function sendShapeData(shape) {
+        var shapeData = {
+          type: shape.type,
+          coordinates: [],
+        };
+
+        if (shape.type === "polygon" || shape.type === "rectangle") {
+          shape.getPath().forEach(function (latlng) {
+            shapeData.coordinates.push({
+              lat: latlng.lat(),
+              lng: latlng.lng(),
+            });
+          });
+        } else if (shape.type === "circle") {
+          shapeData.coordinates.push({
+            center: {
+              lat: shape.getCenter().lat(),
+              lng: shape.getCenter().lng(),
+            },
+            radius: shape.getRadius(),
+          });
+        }
+
+        // Gửi dữ liệu lên API bằng fetch
+        fetch(urlApi + "/set_zone", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(shapeData),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Success:", data);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+      }
+    </script>
+  </body>
+</html>
