@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asset-tracking-be
+spec:
+  selector:
+    matchLabels:
+      app: asset-tracking-be
+  template:
+    metadata:
+      labels:
+        app: asset-tracking-be
+    spec:
+      containers:
+        - name: asset-tracking-be
+          image: <Image>
